@@ -82,6 +82,13 @@ def resumeTorrent():
 def renameFile(originalname):
 	logger('Llamando a filebot con: '+originalname)
 	fb=subprocess.Popen(['filebot','-rename',originalname],stdout=subprocess.PIPE) #filebot
+	fb.wait()
+	if fb.returncode != 0:
+		if fb.returncode == 255:
+			logger('ERROR AL OBTENER EL NOMBRE -> probando non strict')
+				fb=subprocess.Popen(['filebot','-rename',originalname, '-non-strict'],stdout=subprocess.PIPE) #filebot
+			fb.wait()
+			if (fb.returncode != 0) die('Error obteniendo el video con non-strict.')
 	newfilename=""
 	regex = re.compile("Rename.*to\s+\[(?P<g>.*?)\]")
 	for line in fb.stdout:
