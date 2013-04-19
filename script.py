@@ -13,7 +13,7 @@
 
 #TODO soporte para comprimidos, 
 #TODO si el capitulo tiene bien el nombre muere (falla el filebot)
-#TODO ignored folders
+
 import sqlite3 
 import re 
 import sys 
@@ -40,6 +40,8 @@ baseCommand=['transmission-remote', host, '-n '+user+':'+password]
 def initialize():
 	global log,conn,c,originalname, torrent_id, torrent_dir, isDir
 	logger("-------------------------------")
+	if !os.path.isfile(database):
+		die("No database")
 	torrentName = os.getenv('TR_TORRENT_NAME')
 	if torrentName == None : 
 		die("No arg")
@@ -143,6 +145,10 @@ def findVideos(f):
 	logger('Buscando archivos en ' + f)
 	paths = []
 	for root, dirs, files in os.walk(f):
+		for ignored in ignored_folders:
+			for d in dirs:
+				if ignored in d:
+					dirs.remove(d)
 		for file in files:
 			if getExtension(file) in video_extension: paths.append(os.path.join(root,file))
 	return paths
