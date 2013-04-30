@@ -24,7 +24,7 @@ import shutil
 
 video_extension = [ 'mkv', 'avi', 'ogm', 'mp4' ]
 compressed_ext = [ 'rar', 'tar', 'zip', '7z' ]
-ignored_folders = [ 'sample' ]
+ignored_folders = [ 'sample', "Sample", "samples","Samples","SAMPLE","SAMPLES","extra","Extra","EXTRA" ]
 
 basepath = '/storage/'
 moviePath=basepath+'Movies/'
@@ -40,7 +40,7 @@ baseCommand=['transmission-remote', host, '-n '+user+':'+password]
 def initialize():
 	global log,conn,c,originalname, torrent_id, torrent_dir, isDir
 	logger("-------------------------------")
-	if !os.path.isfile(database):
+	if not os.path.isfile(database):
 		die("No database")
 	torrentName = os.getenv('TR_TORRENT_NAME')
 	if torrentName == None : 
@@ -101,9 +101,9 @@ def renameFile(originalname):
 	if fb.returncode != 0:
 		if fb.returncode == 255:
 			logger('ERROR AL OBTENER EL NOMBRE -> probando non strict')
-				fb=subprocess.Popen(['filebot','-rename',originalname, '-non-strict'],stdout=subprocess.PIPE) #filebot
+			fb=subprocess.Popen(['filebot','-rename',originalname, '-non-strict'],stdout=subprocess.PIPE) #filebot
 			fb.wait()
-			if (fb.returncode != 0) die('Error obteniendo el video con non-strict.')
+			if (fb.returncode != 0): die('Error obteniendo el video con non-strict.')
 	newfilename=""
 	regex = re.compile("Rename.*to\s+\[(?P<g>.*?)\]")
 	for line in fb.stdout:
