@@ -30,8 +30,6 @@ SSH_notifications = True
 SSH_user = 'david'
 SSH_target = '192.168.1.200'
 SSH_command = 'notify-send -t 3000 -i /usr/share/icons/hicolor/48x48/apps/transmission.png "%t% finished downloading"' #%t% will be replaced with torrent's name
-
-
 basepath = '/storage/'
 moviePath=basepath+'Movies/'
 database =basepath+'sickbeard.db'
