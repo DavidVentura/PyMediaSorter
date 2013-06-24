@@ -22,9 +22,15 @@ import os
 import datetime
 import shutil
 
+iso_extension = [ 'iso' ]
 video_extension = [ 'mkv', 'avi', 'ogm', 'mp4' ]
 compressed_ext = [ 'rar', 'tar', 'zip', '7z' ]
 ignored_folders = [ 'sample', "Sample", "samples","Samples","SAMPLE","SAMPLES","extra","Extra","EXTRA" ]
+SSH_notifications = True
+SSH_user = 'david'
+SSH_target = '192.168.1.200'
+SSH_command = 'notify-send -t 3000 -i /usr/share/icons/hicolor/48x48/apps/transmission.png "%t% finished downloading"' #%t% will be replaced with torrent's name
+
 
 basepath = '/storage/'
 moviePath=basepath+'Movies/'
@@ -52,10 +58,9 @@ def initialize():
 	except KeyError:
 		die("Setea bien los parametros de ambiente")
 
+	isDir = False
 	if os.path.isdir(os.path.join(torrent_dir,torrentName)):
 		isDir = True
-	else:
-		isDir = False
 
 	originalname=torrentName #esto es valido? No tengo que leer la lista de arhivos?
 	conn = sqlite3.connect(database)
@@ -73,6 +78,9 @@ def die(reason):
 def logger(val):
 	localtime = datetime.datetime.now()
 	log.write(localtime.strftime("%Y-%m-%d %H:%M:%S") + " - " + val+"\n")
+def isIso(f):
+	if getExtension(f) in iso_extension: return True
+	return False
 def isVideo(f):
 	if getExtension(f) in video_extension: return True	
 	return False
@@ -128,6 +136,14 @@ def getExtension(f):
 	if len(lista) < 2: die('Archivo '+f+' sin extension')
 	return lista[len(lista)-1]
 
+def processIso(iso):
+	path=isopath
+	newfile=os.path.join(path,iso)
+	logger("Moviendo archivo " + renamedfile + " a  "+newfile)
+	shutil.move(renamedfile, newfile) #MUEVO EL ARCHIVO
+	logger("Linkeando "+newfile+" a "+ originalfile)
+	os.symlink(newfile, originalfile) #SYMLINK
+
 def processVideo(originalname):
 	newfilename=renameFile(originalname)
 	filedir=os.path.dirname(originalname)
@@ -155,6 +171,11 @@ def findVideos(f):
 	return paths
 
 initialize()
+if SSH_notifications:
+	SSH_command = SSH_command.replace("%t%", originalname)
+	print SSH_command
+	os.system("ssh -o ConnectTimeout=1 " + SSH_user + "@" + SSH_target + " ' export DISPLAY=:0; " + SSH_command + "'")
+	
 logger("Procesando archivo: "+originalname)
 if isDir:
 	files = findVideos(os.path.join(torrent_dir,originalname))
@@ -167,13 +188,16 @@ if isDir:
 		processVideo(video)
 else:
 	pauseTorrent()
-	if isVideo():
-		processVideo()
+	if isVideo(originalname):
+		processVideo(originalname)
 	else:
-		if isCompressed():
+		if isCompressed(originalname):
 			logger("compressed")
 		else:
-			logger("what is this")
+			if isIso(originalname):
+				processIso(originalname)
+			else:
+				logger("what is this")
 
 resumeTorrent()
 close()
