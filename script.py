@@ -151,6 +151,9 @@ def processVideo(originalname):
 	newfile=os.path.join(path,newfilename)
 	originalfile=os.path.join(filedir,originalname)
 
+	if os.path.exists(newfile):
+		die("Casi piso otro archivo")
+
 	logger("Moviendo archivo " + renamedfile + " a  "+newfile)
 	shutil.move(renamedfile, newfile) #MUEVO EL ARCHIVO
 	logger("Linkeando "+newfile+" a "+ originalfile)
