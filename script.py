@@ -24,13 +24,18 @@ import shutil
 
 iso_extension = [ 'iso' ]
 video_extension = [ 'mkv', 'avi', 'ogm', 'mp4' ]
+book_extension = [ 'epub', 'mobi' , 'pdf' ]
 compressed_ext = [ 'rar', 'tar', 'zip', '7z' ]
+valid_extensions = iso_extension + video_extension + book_extension 
 ignored_folders = [ 'sample', "Sample", "samples","Samples","SAMPLE","SAMPLES","extra","Extra","EXTRA" ]
+
 SSH_notifications = True
 SSH_user = 'david'
-SSH_target = '192.168.1.200'
+SSH_target = '192.168.1.7'
 SSH_command = 'notify-send -t 3000 -i /usr/share/icons/hicolor/48x48/apps/transmission.png "%t% finished downloading"' #%t% will be replaced with torrent's name
 basepath = '/storage/'
+isoPath=basepath+'OS/'
+bookPath=basepath+'Docs/Books/'
 moviePath=basepath+'Movies/'
 database =basepath+'sickbeard.db'
 logfile =basepath+'log.log'
@@ -68,6 +73,7 @@ def close():
 	if dbOpen: c.close()
 	logger("Finalizo con exito")
 	log.close()
+	sys.exit()
 def die(reason):
 	logger("Script died. Reason: " + reason)
 	resumeTorrent()
@@ -76,6 +82,8 @@ def die(reason):
 def logger(val):
 	localtime = datetime.datetime.now()
 	log.write(localtime.strftime("%Y-%m-%d %H:%M:%S") + " - " + val+"\n")
+def isBook(f):
+	return getExtension(f) in book_extension
 def isIso(f):
 	if getExtension(f) in iso_extension: return True
 	return False
@@ -99,7 +107,10 @@ def pauseTorrent():
 
 def resumeTorrent():
 	logger('Resumiendo torrent con id '+torrent_id)
-	subprocess.Popen(['transmission-remote', host, '-n', user+':'+password, '-t',torrent_id, '-s'],stdout=subprocess.PIPE) #START
+	try:
+		subprocess.Popen(['transmission-remote', host, '-n', user+':'+password, '-t',torrent_id, '-s'],stdout=subprocess.PIPE) #START
+	except:
+		logger('error al resumir torrent id: ' + torrent_id)
 
 def renameFile(originalname):
 	logger('Llamando a filebot con: '+originalname)
@@ -134,6 +145,27 @@ def getExtension(f):
 	if len(lista) < 2: die('Archivo '+f+' sin extension')
 	return lista[len(lista)-1]
 
+def processCompressed(f):
+	logger("unar: " + f)
+	s=subprocess.Popen(['unar', '-o', torrent_dir,f],stdout=subprocess.PIPE)
+	s.wait()
+	for line in s.stdout:
+		logger(line)
+	newFolder=f.replace("."+getExtension(f),'/')
+	files = findFiles(newFolder)
+	if len(files) == 0:
+		logger("No encontre nada util en la carpeta(comprimida)")
+		close()
+	for f in files:
+		processFile(f)
+
+def processBook(book):
+	newfile=os.path.join(bookPath,os.path.basename(book))
+	logger("Moviendo archivo " + book + " a "+newfile)
+	shutil.move(book, newfile) #MUEVO EL ARCHIVO
+	logger("Linkeando "+newfile+" a "+ book)
+	os.symlink(newfile, book) #SYMLINK
+
 def processIso(iso):
 	path=isopath
 	newfile=os.path.join(path,iso)
@@ -159,7 +191,21 @@ def processVideo(originalname):
 	logger("Linkeando "+newfile+" a "+ originalfile)
 	os.symlink(newfile, originalfile) #SYMLINK
 
-def findVideos(f):
+def findCompressed(f):
+        paths = []
+        for root, dirs, files in os.walk(f):
+                for ignored in ignored_folders:
+                        for d in dirs:
+                                if ignored in d:
+                                        dirs.remove(d)
+                for file in files:
+                        if getExtension(file) in compressed_ext:
+                                paths.append(os.path.join(root,file))
+        if len(paths)==0 and getExtension(f) in compressed_ext:
+                paths.append(f)
+        return paths
+
+def findFiles(f):
 	logger('Buscando archivos en ' + f)
 	paths = []
 	for root, dirs, files in os.walk(f):
@@ -167,38 +213,54 @@ def findVideos(f):
 			for d in dirs:
 				if ignored in d:
 					dirs.remove(d)
-		for file in files:
-			if getExtension(file) in video_extension: paths.append(os.path.join(root,file))
+		for file in files: #no me lo encuentra despues de descomprimir? TODO
+			if getExtension(file) in valid_extensions:
+				paths.append(os.path.join(root,file))
+	if len(paths)==0 and os.path.isfile(f):
+		if getExtension(f) in valid_extensions:
+			paths.append(f)
 	return paths
+
+def processFile(f):
+	if isCompressed(f):
+		processCompressed(f)
+		return
+	if isVideo(f):
+		processVideo(f)
+		return
+	if isIso(f):
+		processIso(f)
+		return
+	if isBook(f):
+		processBook(f)
+		return
+	logger("what is this")
+
 
 initialize()
 if SSH_notifications:
 	SSH_command = SSH_command.replace("%t%", originalname)
-	print SSH_command
-	os.system("ssh -o ConnectTimeout=1 " + SSH_user + "@" + SSH_target + " ' export DISPLAY=:0; " + SSH_command + "'")
+	logger(SSH_command)
+	try:
+		os.system("ssh -o ConnectTimeout=1 " + SSH_user + "@" + SSH_target + " ' export DISPLAY=:0; " + SSH_command + "'")
+	except:
+		logger("Error en el ssh")
 	
-logger("Procesando archivo: "+originalname)
-if isDir:
-	files = findVideos(os.path.join(torrent_dir,originalname))
-	if len(files) == 0:
-		logger("No encontre nada util en la carpeta")
-		close()
-	
-	pauseTorrent()
-	for video in files:
-		processVideo(video)
+logger("Procesando: "+originalname)
+pauseTorrent()
+#compressed
+files = findCompressed(os.path.join(torrent_dir,originalname))
+if len(files) == 0:
+	logger("No encontre comprimidos")
 else:
-	pauseTorrent()
-	if isVideo(originalname):
-		processVideo(originalname)
-	else:
-		if isCompressed(originalname):
-			logger("compressed")
-		else:
-			if isIso(originalname):
-				processIso(originalname)
-			else:
-				logger("what is this")
-
-resumeTorrent()
+	for f in files:
+		processCompressed(f)
+	close()
+#normal
+files = findFiles(os.path.join(torrent_dir,originalname))
+if len(files) == 0:
+	logger("No encontre nada util en la carpeta")
+	close()
+for f in files:
+	processFile(f)
 close()
