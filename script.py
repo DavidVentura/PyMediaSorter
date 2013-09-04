@@ -46,6 +46,8 @@ password='transmission'
 host='localhost'
 baseCommand=['transmission-remote', host, '-n '+user+':'+password]
 
+debugging=0
+
 def initialize():
 	global log,conn,c,originalname, torrent_id, torrent_dir, isDir
 	logger("-------------------------------")
@@ -79,6 +81,10 @@ def die(reason):
 	resumeTorrent()
 	close()
 	sys.exit()
+def debug(val):
+	if debugging == 1:
+		localtime = datetime.datetime.now()
+		log.write(localtime.strftime("%Y-%m-%d %H:%M:%S") + " - " + val+"\n")
 def logger(val):
 	localtime = datetime.datetime.now()
 	log.write(localtime.strftime("%Y-%m-%d %H:%M:%S") + " - " + val+"\n")
@@ -102,11 +108,11 @@ def isFromTV(f):
 			return row[1]+"/"
 	return ''
 def pauseTorrent():
-	logger('Pausando torrent con id '+torrent_id)
+	debug('Pausando torrent con id '+torrent_id)
 	subprocess.Popen(['transmission-remote', host, '-n', user+':'+password, '-t', torrent_id, '-S'],stdout=subprocess.PIPE)
 
 def resumeTorrent():
-	logger('Resumiendo torrent con id '+torrent_id)
+	debug('Resumiendo torrent con id '+torrent_id)
 	try:
 		subprocess.Popen(['transmission-remote', host, '-n', user+':'+password, '-t',torrent_id, '-s'],stdout=subprocess.PIPE) #START
 	except:
@@ -240,7 +246,6 @@ def processFile(f):
 initialize()
 if SSH_notifications:
 	SSH_command = SSH_command.replace("%t%", originalname)
-	logger(SSH_command)
 	try:
 		os.system("ssh -o ConnectTimeout=1 " + SSH_user + "@" + SSH_target + " ' export DISPLAY=:0; " + SSH_command + "'")
 	except:
