@@ -74,6 +74,7 @@ def initialize():
 def close():
 	if dbOpen: c.close()
 	logger("Finalizo con exito")
+	resumeTorrent()
 	log.close()
 	sys.exit()
 def die(reason):
